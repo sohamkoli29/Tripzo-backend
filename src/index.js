@@ -5,6 +5,8 @@ require("dotenv").config();
 const userRoutes = require("./routes/userRoutes");
 const rideRoutes = require("./routes/rideRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
+const driverRoutes = require("./routes/driverRoutes");
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -16,6 +18,7 @@ app.use(express.json());
 app.use("/api/users", userRoutes);
 app.use("/api/rides", rideRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/driver", driverRoutes);  
 
 // Health check
 app.get("/", (req, res) => {
