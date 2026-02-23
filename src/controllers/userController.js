@@ -2,13 +2,27 @@ const supabase = require("../lib/supabaseAdmin");
 
 // GET /api/users/profile
 const getProfile = async (req, res) => {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("users")
     .select("*")
     .eq("id", req.user.id)
     .single();
 
-  if (error) return res.status(404).json({ error: "User not found" });
+  // If no profile exists yet, auto-create one
+  if (error || !data) {
+    const { data: newUser, error: insertError } = await supabase
+      .from("users")
+      .insert({ id: req.user.id })
+      .select()
+      .single();
+
+    if (insertError) {
+      return res.status(500).json({ error: "Failed to create user profile" });
+    }
+
+    return res.json(newUser);
+  }
+
   res.json(data);
 };
 

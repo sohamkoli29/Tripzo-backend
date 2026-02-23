@@ -1,34 +1,67 @@
 const supabase = require("../lib/supabaseAdmin");
 
-// POST /api/rides — Create a new ride request
+// Fare rates per km by ride type
+const FARE_RATES = {
+  standard: { base: 2.0, perKm: 1.5, perMin: 0.25 },
+  premium:  { base: 5.0, perKm: 2.5, perMin: 0.40 },
+  xl:       { base: 3.5, perKm: 2.0, perMin: 0.30 },
+};
+
+// Helper to calculate fare
+const calculateFare = (distance_km, duration_mins, ride_type) => {
+  const rate = FARE_RATES[ride_type] || FARE_RATES.standard;
+  const fare = rate.base + (distance_km * rate.perKm) + (duration_mins * rate.perMin);
+  return parseFloat(fare.toFixed(2));
+};
+
+// POST /api/rides/estimate — Fare estimate (no DB write)
+const estimateFare = async (req, res) => {
+  const { distance_km, duration_mins } = req.body;
+
+  if (!distance_km || !duration_mins) {
+    return res.status(400).json({ error: "distance_km and duration_mins are required" });
+  }
+
+  const estimates = {
+    standard: calculateFare(distance_km, duration_mins, "standard"),
+    premium:  calculateFare(distance_km, duration_mins, "premium"),
+    xl:       calculateFare(distance_km, duration_mins, "xl"),
+  };
+
+  res.json({ estimates, distance_km, duration_mins });
+};
+
+// POST /api/rides — Create a ride request
 const createRide = async (req, res) => {
   const {
     pickup_address, dropoff_address,
-    pickup_lat, pickup_lng,
-    dropoff_lat, dropoff_lng,
-    ride_type
+    pickup_lat,     pickup_lng,
+    dropoff_lat,    dropoff_lng,
+    ride_type,      distance_km,
+    duration_mins,
   } = req.body;
 
   if (!pickup_address || !dropoff_address) {
-    return res.status(400).json({ error: "Pickup and dropoff addresses are required" });
+    return res.status(400).json({ error: "Pickup and dropoff are required" });
   }
 
-  // Simple fare calculation (we'll improve with Maps API on Day 4)
-  const distance_km = 5; // placeholder
-  const fareMap = { standard: 2.5, premium: 4.0, xl: 3.5 };
-  const ratePerKm = fareMap[ride_type] || 2.5;
-  const fare = (distance_km * ratePerKm).toFixed(2);
+  const fare = calculateFare(
+    distance_km   || 5,
+    duration_mins || 10,
+    ride_type     || "standard"
+  );
 
   const { data, error } = await supabase
     .from("rides")
     .insert({
       rider_id: req.user.id,
-      pickup_address, dropoff_address,
-      pickup_lat, pickup_lng,
-      dropoff_lat, dropoff_lng,
+      pickup_address,  dropoff_address,
+      pickup_lat,      pickup_lng,
+      dropoff_lat,     dropoff_lng,
       fare,
-      distance_km,
-      ride_type: ride_type || "standard",
+      distance_km:   distance_km   || 5,
+      duration_mins: duration_mins || 10,
+      ride_type:     ride_type     || "standard",
       status: "requested",
     })
     .select()
@@ -38,7 +71,7 @@ const createRide = async (req, res) => {
   res.status(201).json({ message: "Ride requested!", ride: data });
 };
 
-// GET /api/rides — Get all rides for current user
+// GET /api/rides — All rides for current user
 const getRides = async (req, res) => {
   const { data, error } = await supabase
     .from("rides")
@@ -50,7 +83,19 @@ const getRides = async (req, res) => {
   res.json(data);
 };
 
-// GET /api/rides/:id — Get a single ride
+// GET /api/rides/available — All pending rides for drivers
+const getAvailableRides = async (req, res) => {
+  const { data, error } = await supabase
+    .from("rides")
+    .select("*")
+    .eq("status", "requested")
+    .order("created_at", { ascending: true });
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+};
+
+// GET /api/rides/:id — Single ride
 const getRideById = async (req, res) => {
   const { data, error } = await supabase
     .from("rides")
@@ -72,11 +117,7 @@ const updateRideStatus = async (req, res) => {
   }
 
   const updateData = { status };
-
-  // If driver is accepting, attach their ID
-  if (status === "accepted") {
-    updateData.driver_id = req.user.id;
-  }
+  if (status === "accepted") updateData.driver_id = req.user.id;
 
   const { data, error } = await supabase
     .from("rides")
@@ -89,19 +130,8 @@ const updateRideStatus = async (req, res) => {
   res.json({ message: `Ride ${status}`, ride: data });
 };
 
-// GET /api/rides/available — Drivers see all pending rides
-const getAvailableRides = async (req, res) => {
-  const { data, error } = await supabase
-    .from("rides")
-    .select("*")
-    .eq("status", "requested")
-    .order("created_at", { ascending: true });
-
-  if (error) return res.status(400).json({ error: error.message });
-  res.json(data);
-};
-
 module.exports = {
   createRide, getRides, getRideById,
-  updateRideStatus, getAvailableRides
+  updateRideStatus, getAvailableRides,
+  estimateFare,
 };
