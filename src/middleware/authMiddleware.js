@@ -9,14 +9,22 @@ const authenticate = async (req, res, next) => {
 
   const token = authHeader.split(" ")[1];
 
-  const { data: { user }, error } = await supabase.auth.getUser(token);
-
-  if (error || !user) {
-    return res.status(401).json({ error: "Unauthorized" });
+  if (!token || token === "null" || token === "undefined") {
+    return res.status(401).json({ error: "Missing or invalid token" });
   }
 
-  req.user = user; // attach user to request
-  next();
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+
+    if (error || !user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    req.user = user;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: "Token validation failed" });
+  }
 };
 
 module.exports = authenticate;
