@@ -6,7 +6,7 @@ const userRoutes = require("./routes/userRoutes");
 const rideRoutes = require("./routes/rideRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const driverRoutes = require("./routes/driverRoutes");
-
+const razorpayRoutes = require("./routes/razorpayRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -19,6 +19,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/rides", rideRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/driver", driverRoutes);  
+app.use("/api/razorpay", razorpayRoutes);
 
 // Health check
 app.get("/", (req, res) => {
