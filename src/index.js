@@ -8,7 +8,7 @@ const paymentRoutes = require("./routes/paymentRoutes");
 const driverRoutes = require("./routes/driverRoutes");
 const razorpayRoutes = require("./routes/razorpayRoutes");
 const ratingsRoutes = require("./routes/ratingsRoutes");
-
+const supabase = require("./lib/supabaseAdmin");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -19,7 +19,15 @@ app.use(
   })
 );
 app.use(express.json());
-
+// Health check — keep Render + Supabase alive
+app.get('/api/health', async (req, res) => {
+  try {
+    await supabase.from('test').select('message').limit(1).single();
+    res.status(200).json({ alive: true, db: 'connected' });
+  } catch (err) {
+    res.status(200).json({ alive: true, db: 'error' });
+  }
+});
 // Routes
 app.use("/api/users", userRoutes);
 app.use("/api/rides", rideRoutes);
